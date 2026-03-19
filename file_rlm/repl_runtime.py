@@ -19,14 +19,23 @@ class CommandResult:
     stderr: str
 
 
-def _default_runner(command: list[str], workdir: Path) -> CommandResult:
-    completed = subprocess.run(
-        command,
-        cwd=workdir,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _default_runner(command: list[str], workdir: Path, timeout_seconds: int) -> CommandResult:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=workdir,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return CommandResult(
+            returncode=124,
+            stdout=exc.stdout or "",
+            stderr=f"Timed out after {timeout_seconds} seconds.",
+        )
+
     return CommandResult(
         returncode=completed.returncode,
         stdout=completed.stdout,
@@ -35,7 +44,7 @@ def _default_runner(command: list[str], workdir: Path) -> CommandResult:
 
 
 class DockerREPLRuntime:
-    """Executes model-generated Python inside an ephemeral Docker container."""
+    """Executes model-generated Python inside an ephemeral Docker container with checkpointed state."""
 
     def __init__(
         self,
@@ -67,6 +76,19 @@ class DockerREPLRuntime:
             "docker",
             "run",
             "--rm",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=64m",
+            "--cap-drop=ALL",
+            "--security-opt=no-new-privileges",
+            "--pids-limit",
+            str(self.docker.pids_limit),
+            "--memory",
+            self.docker.memory_limit,
+            "--cpus",
+            self.docker.cpu_limit,
+            "--user",
+            self.docker.user,
             "-v",
             mount,
             "-w",
@@ -89,6 +111,10 @@ class DockerREPLRuntime:
             MODEL = {self.model_settings.subcall_model!r}
             OLLAMA_URL = {self.docker.ollama_url!r}
             MAX_STDOUT = {self.limits.max_stdout_chars}
+            MAX_SUBQUERY_CHARS = {self.limits.max_chars_per_subquery}
+            MAX_SUBCALLS = {self.limits.max_subcalls}
+            TEMPERATURE = {self.model_settings.temperature}
+            REQUEST_TIMEOUT = {self.model_settings.request_timeout_seconds}
 
             with open("state_in.pkl", "rb") as fh:
                 state = pickle.load(fh)
@@ -116,6 +142,8 @@ class DockerREPLRuntime:
                 "zip": zip,
                 "any": any,
                 "all": all,
+                "abs": abs,
+                "round": round,
             }}
 
             def blocked_import(*args, **kwargs):
@@ -127,12 +155,26 @@ class DockerREPLRuntime:
             safe_builtins["__import__"] = blocked_import
 
             def llm_query(text: str) -> str:
-                state["__subcall_count"] = int(state.get("__subcall_count", 0)) + 1
+                if not isinstance(text, str):
+                    raise TypeError("llm_query(text) expects a string argument.")
+                if len(text) > MAX_SUBQUERY_CHARS:
+                    raise ValueError(
+                        f"llm_query payload exceeds the {{MAX_SUBQUERY_CHARS}}-character limit. "
+                        f"Received {{len(text)}} characters."
+                    )
+
+                current_count = int(state.get("__subcall_count", 0))
+                if current_count >= MAX_SUBCALLS:
+                    raise RuntimeError(
+                        f"llm_query subcall limit reached ({{MAX_SUBCALLS}}). Consolidate evidence and stop making more subcalls."
+                    )
+                state["__subcall_count"] = current_count + 1
+
                 payload = json.dumps({{
                     "model": MODEL,
                     "prompt": text,
                     "stream": False,
-                    "options": {{"temperature": 0}},
+                    "options": {{"temperature": TEMPERATURE}},
                 }}).encode("utf-8")
                 req = urllib.request.Request(
                     url=f"{{OLLAMA_URL}}/api/generate",
@@ -140,7 +182,7 @@ class DockerREPLRuntime:
                     headers={{"Content-Type": "application/json"}},
                     method="POST",
                 )
-                with urllib.request.urlopen(req, timeout=120) as response:
+                with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as response:
                     body = json.loads(response.read().decode("utf-8"))
                 return body["response"]
 
@@ -166,7 +208,7 @@ class DockerREPLRuntime:
             except Exception as exc:
                 error = f"{{type(exc).__name__}}: {{exc}}"
 
-            new_state = {{"__subcall_count": env.get("__subcall_count", state.get("__subcall_count", 0))}}
+            new_state = {{"__subcall_count": state.get("__subcall_count", 0)}}
             for key, value in env.items():
                 if key in {{"__builtins__", "llm_query", "re"}}:
                     continue
@@ -194,6 +236,10 @@ class DockerREPLRuntime:
     def execute(self, code: str) -> REPLExecutionResult:
         if not self._state:
             raise RuntimeError("Runtime must be initialized before execution.")
+        if len(code) > self.limits.max_repl_code_chars:
+            raise RuntimeError(
+                f"REPL code exceeds the {self.limits.max_repl_code_chars}-character limit."
+            )
 
         base_dir = self.workspace_root
         if base_dir is None:
@@ -205,13 +251,15 @@ class DockerREPLRuntime:
             workdir.mkdir(parents=True, exist_ok=True)
             cleanup = None
 
+        workdir.chmod(0o777)
+
         try:
             (workdir / "state_in.pkl").write_bytes(pickle.dumps(self._state))
             (workdir / "user_code.py").write_text(code, encoding="utf-8")
             self._write_runner_script(workdir)
 
             command = self._build_docker_command(workdir)
-            result = self.runner(command, workdir)
+            result = self.runner(command, workdir, self.limits.repl_timeout_seconds)
             if result.returncode != 0:
                 raise RuntimeError(result.stderr or "Docker REPL execution failed.")
 
@@ -228,6 +276,16 @@ class DockerREPLRuntime:
 
     def get_variable(self, name: str) -> object:
         return self._state[name]
+
+    def set_variable(self, name: str, value: object) -> None:
+        try:
+            pickle.dumps(value)
+        except Exception as exc:
+            raise TypeError(f"Value for `{name}` is not pickleable and cannot persist across steps.") from exc
+        self._state[name] = value
+
+    def list_variables(self) -> tuple[str, ...]:
+        return tuple(sorted(self._state.keys()))
 
     def close(self) -> None:
         return None

@@ -39,12 +39,20 @@ class REPLExecutionResult:
 class OllamaClient(Protocol):
     """Minimal adapter expected by the future engine."""
 
-    def generate(self, *, system_prompt: str, user_prompt: str, model: str) -> str:
+    def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model: str,
+        temperature: float = 0.0,
+        timeout_seconds: int = 120,
+    ) -> str:
         ...
 
 
 class REPLRuntime(Protocol):
-    """Persistent execution environment for the future engine."""
+    """Checkpointed execution environment for the future engine."""
 
     def initialize(self, *, context: str, question: str, metadata: dict[str, object]) -> None:
         ...
@@ -53,6 +61,12 @@ class REPLRuntime(Protocol):
         ...
 
     def get_variable(self, name: str) -> object:
+        ...
+
+    def set_variable(self, name: str, value: object) -> None:
+        ...
+
+    def list_variables(self) -> tuple[str, ...]:
         ...
 
     def close(self) -> None:

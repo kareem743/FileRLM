@@ -10,7 +10,15 @@ class OllamaHTTPClient:
     def __init__(self, host: str) -> None:
         self.host = host.rstrip("/")
 
-    def generate(self, *, system_prompt: str, user_prompt: str, model: str) -> str:
+    def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model: str,
+        temperature: float = 0.0,
+        timeout_seconds: int = 120,
+    ) -> str:
         payload = {
             "model": model,
             "stream": False,
@@ -18,7 +26,7 @@ class OllamaHTTPClient:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "options": {"temperature": 0},
+            "options": {"temperature": temperature},
         }
         data = json.dumps(payload).encode("utf-8")
         req = request.Request(
@@ -27,7 +35,7 @@ class OllamaHTTPClient:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with request.urlopen(req, timeout=120) as response:
+        with request.urlopen(req, timeout=timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
 
         return body["message"]["content"]
