@@ -55,7 +55,6 @@ def test_docker_repl_runtime_can_execute_python(tmp_path) -> None:
     assert "314159" in result.stdout
     assert runtime.get_variable("answer") == "314159"
 
-
 @pytest.mark.integration
 def test_ollama_client_can_get_a_response() -> None:
     client = OllamaHTTPClient(host=ModelSettings().ollama_host)

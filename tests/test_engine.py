@@ -165,7 +165,7 @@ def test_engine_emits_progress_updates() -> None:
     )
 
     assert result.answer == "needle found in alpha needle omega"
-    assert any("Step 1/" in update for update in updates)
+    assert any("Depth 0 step 1/" in update for update in updates)
     assert any("Generated REPL code" in update for update in updates)
     assert any("scratch = 'needle found in alpha needle omega'" in update for update in updates)
     assert any("Final answer" in update for update in updates)
