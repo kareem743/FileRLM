@@ -123,6 +123,7 @@ class DockerREPLRuntime:
                 user_code = fh.read()
 
             safe_builtins = {{
+                "type" :type,
                 "len": len,
                 "range": range,
                 "min": min,
@@ -146,13 +147,29 @@ class DockerREPLRuntime:
                 "round": round,
             }}
 
-            def blocked_import(*args, **kwargs):
-                raise ImportError(
-                    "Imports are disabled in this REPL. Use the preloaded variables "
-                    "`context`, `query`, `metadata`, `llm_query`, and `re`."
-                )
+            builtin_import = __import__
 
-            safe_builtins["__import__"] = blocked_import
+            def guarded_import(name, globals=None, locals=None, fromlist=(), level=0):
+                allowed = {{
+                    "re",
+                    "json",
+                    "math",
+                    "collections",
+                    "itertools",
+                    "statistics",
+                    "datetime",
+                    "ast",
+                    "string",
+                    "textwrap",
+                }}
+                if level != 0:
+                    raise ImportError("Relative imports are not allowed in this REPL.")
+                root_name = name.split(".", 1)[0]
+                if root_name in allowed:
+                    return builtin_import(name, globals, locals, fromlist, level)
+                raise ImportError(f"Import '{{name}}' is not allowed in this REPL.")
+
+            safe_builtins["__import__"] = guarded_import
 
             def llm_query(text: str) -> str:
                 if not isinstance(text, str):
