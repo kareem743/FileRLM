@@ -10,6 +10,7 @@ def build_root_system_prompt(*, max_chars_per_subquery: int, subcall_model: str)
         "The full user document is stored in a variable named `context`. "
         "The question is stored in `query`. "
         "You can inspect, transform, and analyze the document by writing Python in ```repl``` blocks. "
+        "CRITICAL: This REPL does not automatically print bare expressions. You MUST use print() to see the value of any variable. For example, do not just write 'context[:500]', write 'print(context[:500])'."
         "You also have access to `llm_query(text)` for semantic analysis of chunks inside the isolated runtime. "
         "Use the preloaded variables and helpers already available in the environment: `context`, `query`, `metadata`, `llm_query`, and `re`. "
         "Do not use import statements. Do not use open(). Do not use filesystem access. The document is already loaded in `context`. "
