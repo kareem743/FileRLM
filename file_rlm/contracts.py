@@ -11,7 +11,7 @@ class QuestionRequest:
 
     file_path: Path
     question: str
-    max_root_iterations: int = 12
+    max_root_iterations: int = 26
     max_recursion_depth: int = 1
 
 
@@ -36,8 +36,8 @@ class REPLExecutionResult:
     error: str | None = None
 
 
-class OllamaClient(Protocol):
-    """Minimal adapter expected by the future engine."""
+class LLMClient(Protocol):
+    """Minimal model adapter expected by the engine."""
 
     def generate(
         self,

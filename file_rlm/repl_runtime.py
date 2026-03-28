@@ -109,7 +109,7 @@ class DockerREPLRuntime:
             from contextlib import redirect_stdout
 
             MODEL = {self.model_settings.subcall_model!r}
-            OLLAMA_URL = {self.docker.ollama_url!r}
+            MODEL_GATEWAY_URL = {self.docker.model_gateway_url!r}
             MAX_STDOUT = {self.limits.max_stdout_chars}
             MAX_SUBQUERY_CHARS = {self.limits.max_chars_per_subquery}
             MAX_SUBCALLS = {self.limits.max_subcalls}
@@ -194,7 +194,7 @@ class DockerREPLRuntime:
                     "options": {{"temperature": TEMPERATURE}},
                 }}).encode("utf-8")
                 req = urllib.request.Request(
-                    url=f"{{OLLAMA_URL}}/api/generate",
+                    url=f"{{MODEL_GATEWAY_URL}}/api/generate",
                     data=payload,
                     headers={{"Content-Type": "application/json"}},
                     method="POST",

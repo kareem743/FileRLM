@@ -14,7 +14,9 @@ def build_root_system_prompt(*, max_chars_per_subquery: int, subcall_model: str)
         "CRITICAL: This REPL does not automatically print bare expressions. You MUST use print() to see the value of any variable.'."
         "You also have access to `llm_query(text)` for semantic analysis of chunks inside the isolated runtime. "
         "Use the preloaded variables and helpers already available in the environment: `re`,`context`, `query`, `metadata`, `llm_query`. "
-        "Do not use import statements. Do not use open(). Do not use filesystem access. The document is already loaded in `context`. "
+        "Safe stdlib imports are allowed from the approved whitelist. "
+        "`re` is available and may also be imported normally. "
+        "Do not use open(). Avoid filesystem, subprocess, and network libraries. The document is already loaded in `context`. "
         "State is checkpointed between turns, not kept in a single live interpreter. Only non-callable, pickleable variables persist between steps, so store intermediate results in plain Python data structures. "
         "You may also spawn a bounded recursive subproblem through the engine by returning a ```recurse``` block whose body is JSON. "
         'Use the keys `question` plus either `context_var` or `context`. Prefer `context_var` after creating a smaller text variable in REPL. '
