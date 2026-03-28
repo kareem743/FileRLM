@@ -27,13 +27,13 @@ class RLMEngine:
         self,
         *,
         document_loader: DocumentLoader,
-        ollama_client,
+        llm_client,
         runtime_factory: Callable[[], REPLRuntime],
         model_settings: ModelSettings,
         limits: RuntimeLimits,
     ) -> None:
         self.document_loader = document_loader
-        self.ollama_client = ollama_client
+        self.llm_client = llm_client
         self.runtime_factory = runtime_factory
         self.model_settings = model_settings
         self.limits = limits
@@ -148,7 +148,7 @@ class RLMEngine:
                 emit(
                     f"Depth {current_depth} step {iteration}/{effective_iterations}: querying root model"
                 )
-                response = self.ollama_client.generate(
+                response = self.llm_client.generate(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     model=self.model_settings.root_model,
