@@ -5,8 +5,8 @@ import sys
 from file_rlm.config import DockerSettings, ModelSettings, RuntimeLimits
 from file_rlm.engine import RLMEngine
 from file_rlm.gui.main_window import MainWindow
+from file_rlm.llama_cpp_client import LlamaCppClient
 from file_rlm.loaders import DocumentLoader
-from file_rlm.ollama_client import OllamaHTTPClient
 from file_rlm.repl_runtime import DockerREPLRuntime
 
 
@@ -14,11 +14,11 @@ def build_engine() -> RLMEngine:
     model_settings = ModelSettings()
     limits = RuntimeLimits()
     docker = DockerSettings()
-    ollama_client = OllamaHTTPClient(host=model_settings.ollama_host)
+    llm_client = LlamaCppClient(settings=model_settings)
 
     return RLMEngine(
         document_loader=DocumentLoader(),
-        ollama_client=ollama_client,
+        llm_client=llm_client,
         runtime_factory=lambda: DockerREPLRuntime(
             docker=docker,
             model_settings=model_settings,
