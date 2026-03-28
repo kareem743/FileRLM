@@ -1,3 +1,5 @@
 PyQt6>=6.7
 cryptography>=3.1
 pypdf>=5.0
+huggingface_hub>=0.24
+llama-cpp-python>=0.2.90

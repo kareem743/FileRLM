@@ -18,11 +18,20 @@ class FakeLoader:
         )
 
 
-class FakeOllamaClient:
+class FakeLLMClient:
     def __init__(self) -> None:
         self.calls = 0
 
-    def generate(self, *, system_prompt: str, user_prompt: str, model: str) -> str:
+    def generate(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        model: str,
+        temperature: float = 0.0,
+        timeout_seconds: int = 120,
+    ) -> str:
+        del system_prompt, model, temperature, timeout_seconds
         self.calls += 1
 
         if self.calls == 1:
@@ -59,7 +68,7 @@ def test_engine_can_finish_with_final_var() -> None:
     runtime = FakeRuntime()
     engine = RLMEngine(
         document_loader=FakeLoader(),
-        ollama_client=FakeOllamaClient(),
+        llm_client=FakeLLMClient(),
         runtime_factory=lambda: runtime,
         model_settings=ModelSettings(),
         limits=RuntimeLimits(),
@@ -78,13 +87,22 @@ def test_engine_can_finish_with_final_var() -> None:
 
 def test_engine_can_finish_with_direct_final() -> None:
     class DirectFinalClient:
-        def generate(self, *, system_prompt: str, user_prompt: str, model: str) -> str:
+        def generate(
+            self,
+            *,
+            system_prompt: str,
+            user_prompt: str,
+            model: str,
+            temperature: float = 0.0,
+            timeout_seconds: int = 120,
+        ) -> str:
+            del system_prompt, user_prompt, model, temperature, timeout_seconds
             return "FINAL(The answer is 42.)"
 
     runtime = FakeRuntime()
     engine = RLMEngine(
         document_loader=FakeLoader(),
-        ollama_client=DirectFinalClient(),
+        llm_client=DirectFinalClient(),
         runtime_factory=lambda: runtime,
         model_settings=ModelSettings(),
         limits=RuntimeLimits(),
@@ -101,7 +119,16 @@ def test_engine_reprompts_after_invalid_model_output() -> None:
         def __init__(self) -> None:
             self.prompts: list[str] = []
 
-        def generate(self, *, system_prompt: str, user_prompt: str, model: str) -> str:
+        def generate(
+            self,
+            *,
+            system_prompt: str,
+            user_prompt: str,
+            model: str,
+            temperature: float = 0.0,
+            timeout_seconds: int = 120,
+        ) -> str:
+            del system_prompt, model, temperature, timeout_seconds
             self.prompts.append(user_prompt)
             if len(self.prompts) == 1:
                 return "I think the answer is probably in the text."
@@ -110,7 +137,7 @@ def test_engine_reprompts_after_invalid_model_output() -> None:
     client = InvalidThenFinalClient()
     engine = RLMEngine(
         document_loader=FakeLoader(),
-        ollama_client=client,
+        llm_client=client,
         runtime_factory=FakeRuntime,
         model_settings=ModelSettings(),
         limits=RuntimeLimits(),
@@ -125,12 +152,21 @@ def test_engine_reprompts_after_invalid_model_output() -> None:
 
 def test_engine_raises_after_iteration_limit() -> None:
     class AlwaysInvalidClient:
-        def generate(self, *, system_prompt: str, user_prompt: str, model: str) -> str:
+        def generate(
+            self,
+            *,
+            system_prompt: str,
+            user_prompt: str,
+            model: str,
+            temperature: float = 0.0,
+            timeout_seconds: int = 120,
+        ) -> str:
+            del system_prompt, user_prompt, model, temperature, timeout_seconds
             return "still invalid"
 
     engine = RLMEngine(
         document_loader=FakeLoader(),
-        ollama_client=AlwaysInvalidClient(),
+        llm_client=AlwaysInvalidClient(),
         runtime_factory=FakeRuntime,
         model_settings=ModelSettings(),
         limits=RuntimeLimits(),
@@ -153,7 +189,7 @@ def test_engine_emits_progress_updates() -> None:
     runtime = FakeRuntime()
     engine = RLMEngine(
         document_loader=FakeLoader(),
-        ollama_client=FakeOllamaClient(),
+        llm_client=FakeLLMClient(),
         runtime_factory=lambda: runtime,
         model_settings=ModelSettings(),
         limits=RuntimeLimits(),

@@ -8,7 +8,7 @@ def test_question_request_defaults_match_the_planned_root_loop() -> None:
 
     assert request.file_path == Path("sample.txt")
     assert request.question == "What is the answer?"
-    assert request.max_root_iterations == 12
+    assert request.max_root_iterations == 26
     assert request.max_recursion_depth == 1
 
 

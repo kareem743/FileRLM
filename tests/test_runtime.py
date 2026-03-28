@@ -26,7 +26,8 @@ def test_docker_runtime_builds_expected_command() -> None:
 def test_docker_runtime_updates_state_from_runner(tmp_path) -> None:
     captured: dict[str, object] = {}
 
-    def fake_runner(command, workdir):
+    def fake_runner(command, workdir, timeout_seconds):
+        del timeout_seconds
         captured["command"] = command
         state = pickle.loads((workdir / "state_in.pkl").read_bytes())
         state["buffer"] = state["context"][:5]
@@ -74,7 +75,8 @@ def test_docker_runtime_requires_initialize_before_execute(tmp_path) -> None:
 
 
 def test_docker_runtime_surfaces_runner_failures(tmp_path) -> None:
-    def failing_runner(command, workdir):
+    def failing_runner(command, workdir, timeout_seconds):
+        del command, workdir, timeout_seconds
         return CommandResult(returncode=1, stdout="", stderr="container failed")
 
     runtime = DockerREPLRuntime(
@@ -90,7 +92,7 @@ def test_docker_runtime_surfaces_runner_failures(tmp_path) -> None:
         runtime.execute("print('hello')")
 
 
-def test_docker_runner_script_explains_disabled_imports(tmp_path) -> None:
+def test_docker_runner_script_allows_whitelisted_imports(tmp_path) -> None:
     runtime = DockerREPLRuntime(
         docker=DockerSettings(),
         model_settings=ModelSettings(),
@@ -103,5 +105,6 @@ def test_docker_runner_script_explains_disabled_imports(tmp_path) -> None:
     runtime._write_runner_script(workdir)
     script = (workdir / "runner.py").read_text(encoding="utf-8")
 
-    assert "Imports are disabled in this REPL" in script
-    assert "Use the preloaded variables" in script
+    assert "def guarded_import" in script
+    assert '"re"' in script
+    assert "Import '{name}' is not allowed in this REPL." in script

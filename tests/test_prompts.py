@@ -6,17 +6,18 @@ from file_rlm.repl_runtime import REPLExecutionResult
 
 
 def test_root_prompt_mentions_context_llm_query_and_qwen_limits() -> None:
-    prompt = build_root_system_prompt(max_chars_per_subquery=24_000)
+    prompt = build_root_system_prompt(max_chars_per_subquery=24_000, subcall_model="qwen3:8b")
 
     assert "context" in prompt
     assert "llm_query" in prompt
     assert "truncated outputs" in prompt
-    assert "24k characters" in prompt
+    assert "24,000 characters" in prompt
     assert "FINAL(" in prompt
     assert "FINAL_VAR(" in prompt
-    assert "Do not use import" in prompt
+    assert "Safe stdlib imports are allowed from the approved whitelist." in prompt
+    assert "`re` is available and may also be imported normally." in prompt
     assert "Do not use open()" in prompt
-    assert "filesystem access" in prompt
+    assert "Avoid filesystem, subprocess, and network libraries." in prompt
     assert "`re`" in prompt
 
 

@@ -1,3 +1,4 @@
+import importlib
 import subprocess
 from pathlib import Path
 
@@ -6,38 +7,43 @@ import pytest
 from file_rlm.config import DockerSettings, ModelSettings, RuntimeLimits
 from file_rlm.contracts import QuestionRequest
 from file_rlm.engine import RLMEngine
+from file_rlm.llama_cpp_client import LlamaCppClient
 from file_rlm.loaders import DocumentLoader
-from file_rlm.ollama_client import OllamaHTTPClient
 from file_rlm.repl_runtime import DockerREPLRuntime
 
 
-@pytest.mark.integration
-def test_docker_daemon_is_available() -> None:
+def require_docker_daemon() -> None:
     result = subprocess.run(
         ["docker", "info"],
         capture_output=True,
         text=True,
         check=False,
     )
+    if result.returncode != 0:
+        pytest.skip(result.stderr or result.stdout or "Docker daemon is unavailable.")
 
-    assert result.returncode == 0, result.stderr or result.stdout
+
+def require_llama_cpp_runtime() -> None:
+    try:
+        importlib.import_module("llama_cpp")
+    except Exception as exc:  # pragma: no cover - dependent on local machine state.
+        pytest.skip(f"llama_cpp runtime is unavailable: {exc}")
 
 
 @pytest.mark.integration
-def test_ollama_has_qwen3_8b_installed() -> None:
-    result = subprocess.run(
-        ["ollama", "list"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def test_docker_daemon_is_available() -> None:
+    require_docker_daemon()
 
-    assert result.returncode == 0, result.stderr or result.stdout
-    assert "qwen3:8b" in result.stdout
+
+@pytest.mark.integration
+def test_llama_cpp_dependency_is_installed() -> None:
+    require_llama_cpp_runtime()
 
 
 @pytest.mark.integration
 def test_docker_repl_runtime_can_execute_python(tmp_path) -> None:
+    require_docker_daemon()
+
     runtime = DockerREPLRuntime(
         docker=DockerSettings(),
         model_settings=ModelSettings(),
@@ -55,13 +61,20 @@ def test_docker_repl_runtime_can_execute_python(tmp_path) -> None:
     assert "314159" in result.stdout
     assert runtime.get_variable("answer") == "314159"
 
+
 @pytest.mark.integration
-def test_ollama_client_can_get_a_response() -> None:
-    client = OllamaHTTPClient(host=ModelSettings().ollama_host)
+def test_llama_cpp_client_can_get_a_response() -> None:
+    require_llama_cpp_runtime()
+    settings = ModelSettings()
+    model_path = settings.models_dir / settings.root_filename
+    if not model_path.exists():
+        pytest.skip(f"Local model file is missing: {model_path}")
+
+    client = LlamaCppClient(settings=settings)
     response = client.generate(
         system_prompt="Reply with exactly one word: OK",
         user_prompt="Say OK",
-        model="qwen3:8b",
+        model=settings.root_model,
     )
 
     assert response.strip()
@@ -69,17 +82,24 @@ def test_ollama_client_can_get_a_response() -> None:
 
 @pytest.mark.integration
 def test_live_engine_can_answer_a_simple_txt_question(tmp_path) -> None:
+    require_docker_daemon()
+    require_llama_cpp_runtime()
+
+    model_settings = ModelSettings()
+    model_path = model_settings.models_dir / model_settings.root_filename
+    if not model_path.exists():
+        pytest.skip(f"Local model file is missing: {model_path}")
+
     file_path = tmp_path / "sample.txt"
     file_path.write_text(
         "The access code is 314159.\nThis is a smoke test file.",
         encoding="utf-8",
     )
 
-    model_settings = ModelSettings()
     limits = RuntimeLimits(max_root_iterations=4)
     engine = RLMEngine(
         document_loader=DocumentLoader(),
-        ollama_client=OllamaHTTPClient(host=model_settings.ollama_host),
+        llm_client=LlamaCppClient(settings=model_settings),
         runtime_factory=lambda: DockerREPLRuntime(
             docker=DockerSettings(),
             model_settings=model_settings,

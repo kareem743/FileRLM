@@ -1,12 +1,14 @@
 from file_rlm.config import AppConfig, DockerSettings, ModelSettings, RuntimeLimits
 
 
-def test_model_settings_are_local_ollama_friendly() -> None:
+def test_model_settings_are_local_llama_cpp_friendly() -> None:
     settings = ModelSettings()
 
-    assert settings.root_model == "qwen3:8b"
-    assert settings.subcall_model == "qwen3:8b"
-    assert settings.ollama_host.startswith("http://")
+    assert settings.root_repo_id == "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF"
+    assert settings.root_filename == "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
+    assert settings.subcall_repo_id == "bartowski/Qwen_Qwen3-8B-GGUF"
+    assert settings.subcall_filename
+    assert settings.models_dir.name == "gguf"
     assert settings.temperature == 0.0
 
 
@@ -19,11 +21,11 @@ def test_runtime_limits_are_positive() -> None:
     assert limits.max_stdout_chars > 0
 
 
-def test_docker_settings_target_host_ollama_from_container() -> None:
+def test_docker_settings_target_model_gateway_from_container() -> None:
     docker = DockerSettings()
 
     assert docker.image == "python:3.11-slim"
-    assert docker.ollama_url == "http://host.docker.internal:11434"
+    assert docker.model_gateway_url == "http://host.docker.internal:8010"
     assert docker.workdir == "/workspace"
 
 
