@@ -1,8 +1,9 @@
 import threading
 import time
+from pathlib import Path
 
 from file_rlm.config import ModelSettings
-from file_rlm.llama_cpp_client import LlamaCppClient
+from file_rlm.llama_cpp_client import LlamaCppClient, _get_llama_logger
 
 
 class FakeLlama:
@@ -68,3 +69,15 @@ def test_generate_subcall_uses_loaded_subcall_model() -> None:
     result = client.generate_subcall(prompt="needle")
 
     assert result == "SUB:needle"
+
+
+def test_llama_logger_writes_to_file(tmp_path) -> None:
+    log_path = tmp_path / "llama_debug.log"
+    logger = _get_llama_logger(log_path)
+
+    logger.info("test-message")
+    for handler in logger.handlers:
+        handler.flush()
+
+    content = log_path.read_text(encoding="utf-8")
+    assert "test-message" in content

@@ -6,9 +6,11 @@ def test_model_settings_are_local_llama_cpp_friendly() -> None:
 
     assert settings.root_repo_id == "bartowski/Qwen2.5-Coder-7B-Instruct-GGUF"
     assert settings.root_filename == "Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
+    assert settings.subcall_model == "Qwen_Qwen3-8B-Q4_K_M.gguf"
     assert settings.subcall_repo_id == "bartowski/Qwen_Qwen3-8B-GGUF"
-    assert settings.subcall_filename
+    assert settings.subcall_filename == "Qwen_Qwen3-8B-Q4_K_M.gguf"
     assert settings.models_dir.name == "gguf"
+    assert settings.models_dir.parent.name == "models"
     assert settings.temperature == 0.0
 
 
@@ -25,7 +27,8 @@ def test_docker_settings_target_model_gateway_from_container() -> None:
     docker = DockerSettings()
 
     assert docker.image == "python:3.11-slim"
-    assert docker.model_gateway_url == "http://host.docker.internal:8010"
+    assert docker.model_gateway_url == "http://host.docker.internal:8010/v1/subcall"
+    assert docker.model_gateway_bind_host == "0.0.0.0"
     assert docker.workdir == "/workspace"
 
 

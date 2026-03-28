@@ -108,3 +108,21 @@ def test_docker_runner_script_allows_whitelisted_imports(tmp_path) -> None:
     assert "def guarded_import" in script
     assert '"re"' in script
     assert "Import '{name}' is not allowed in this REPL." in script
+
+
+def test_docker_runner_script_uses_custom_llama_cpp_gateway_shape(tmp_path) -> None:
+    runtime = DockerREPLRuntime(
+        docker=DockerSettings(),
+        model_settings=ModelSettings(),
+        limits=RuntimeLimits(),
+        workspace_root=tmp_path,
+    )
+
+    workdir = tmp_path / "docker_runtime"
+    workdir.mkdir(parents=True, exist_ok=True)
+    runtime._write_runner_script(workdir)
+    script = (workdir / "runner.py").read_text(encoding="utf-8")
+
+    assert "/api/generate" not in script
+    assert 'url=MODEL_GATEWAY_URL' in script
+    assert '"prompt": text' in script
